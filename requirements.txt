@@ -1,0 +1,3 @@
+stable-retro
+opencv-python
+numpy
