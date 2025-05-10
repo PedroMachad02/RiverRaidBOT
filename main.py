@@ -2,7 +2,7 @@ import retro
 import cv2
 from time import sleep
 
-# Define key-to-button index mapping
+
 KEY_MAP = {
     ord(' '): 0,           # B
     ord('2'): 1,           # 
@@ -15,39 +15,48 @@ KEY_MAP = {
     ord('c'): 8            # A
 }
 
-# Initialize emulator from ROM file
-jogo = retro.RetroEmulator("river-raid.a26")
 
-# Initial empty button state
-buttons = [0] * 9
+def init_game():
+    jogo = retro.RetroEmulator("river-raid.a26")
+    return jogo
 
-while True:
-    sleep(0.016)
 
-    # Set current input state
-    jogo.set_button_mask(buttons)
+def get_frame(jogo):
+    frame = jogo.get_screen()
+    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) # Convert the screen to BGR format
+    scaled_frame = cv2.resize(frame, None, fx=3, fy=3, interpolation=cv2.INTER_NEAREST) # Resize the screen for better visibility
+    return scaled_frame
 
-    # Advance one frame
-    jogo.step()
 
-    # Get the screen
-    screen = jogo.get_screen()
-    screen = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
-    cv2.imshow("River Raid", screen)
+def display_screen(title, frame):
+    cv2.imshow(title, frame)
 
-    # Read key input
-    key = cv2.waitKey(1) & 0xFF
 
-    # If a key is pressed and mapped, toggle it
-    if key in KEY_MAP:
-        btn_index = KEY_MAP[key]
-        buttons[btn_index] = 1  # Press
+def main ():
+    jogo = init_game()
+    buttons = [0] * 9
 
-    # Release all buttons when no key is pressed (basic approach)
-    else:
-        buttons = [0] * 9
+    while True:
+        sleep(0.016) # Set the frame rate (60 FPS)
 
-    if key == ord('q'):  # Quit with 'q'
-        break
+        jogo.set_button_mask(buttons)
 
-cv2.destroyAllWindows()
+        jogo.step()
+        frame = get_frame(jogo)
+        display_screen("River Raid", frame)
+
+        key = cv2.waitKey(1) & 0xFF
+        if key in KEY_MAP:
+            btn_index = KEY_MAP[key]
+            buttons[btn_index] = 1  # Press
+        else:
+            buttons = [0] * 9
+
+        if key == ord('q'): # Quit with 'q'
+            break  
+
+    cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()
