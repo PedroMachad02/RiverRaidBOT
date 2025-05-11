@@ -1,19 +1,9 @@
 import retro
 import cv2
-from time import sleep
+import time
 
-
-KEY_MAP = {
-    ord(' '): 0,           # B
-    ord('2'): 1,           # 
-    ord('1'): 2,           # Select
-    ord('0'): 3,           # Start
-    ord('w'): 4,           # Up
-    ord('s'): 5,           # Down
-    ord('a'): 6,           # Left
-    ord('d'): 7,           # Right
-    ord('c'): 8            # A
-}
+from bot import Bot
+from controls import Controls
 
 
 def init_game():
@@ -25,7 +15,8 @@ def get_frame(jogo):
     frame = jogo.get_screen()
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) # Convert the screen to BGR format
     scaled_frame = cv2.resize(frame, None, fx=3, fy=3, interpolation=cv2.INTER_NEAREST) # Resize the screen for better visibility
-    return scaled_frame
+    real_frame = scaled_frame[6:602,24:480] # Crop the screen to remove unnecessary borders
+    return real_frame
 
 
 def display_screen(title, frame):
@@ -34,26 +25,25 @@ def display_screen(title, frame):
 
 def main ():
     jogo = init_game()
-    buttons = [0] * 9
+
+    controls = Controls()
+    bot = Bot(controls)
 
     while True:
-        sleep(0.016) # Set the frame rate (60 FPS)
-
-        jogo.set_button_mask(buttons)
-
-        jogo.step()
+        cv2.waitKey(1)
         frame = get_frame(jogo)
+        bot.refresh(frame)
         display_screen("River Raid", frame)
 
-        key = cv2.waitKey(1) & 0xFF
-        if key in KEY_MAP:
-            btn_index = KEY_MAP[key]
-            buttons[btn_index] = 1  # Press
-        else:
-            buttons = [0] * 9
+        #controls.update_manual_buttons()
+        jogo.set_button_mask(controls.buttons)
 
-        if key == ord('q'): # Quit with 'q'
-            break  
+        if controls.quit:
+            break
+
+        jogo.step()
+        time.sleep(0.016) # Set the frame rate (60 FPS)
+
 
     cv2.destroyAllWindows()
 
