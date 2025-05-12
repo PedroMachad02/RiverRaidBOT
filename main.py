@@ -30,14 +30,15 @@ def main ():
     bot = Bot(controls)
 
     while True:
-        cv2.waitKey(1)
+        key = cv2.waitKey(1)
+
         frame = get_frame(jogo)
         bot.refresh(frame)
         display_screen("River Raid", frame)
 
-        #controls.update_manual_buttons()
+        controls.process_key(key)
+        controls.update_inputs()
         jogo.set_button_mask(controls.buttons)
-
         if controls.quit:
             break
 

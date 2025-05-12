@@ -1,3 +1,4 @@
 stable-retro
 opencv-python
 numpy
+keyboard

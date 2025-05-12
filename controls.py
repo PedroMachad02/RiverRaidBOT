@@ -1,53 +1,62 @@
-from cv2 import waitKey
 from time import time
+from enum import Enum
+
+class Command(Enum):
+    B = 0
+    UNKNOWN = 1
+    SELECT = 2
+    START = 3
+    UP = 4
+    DOWN = 5
+    LEFT = 6
+    RIGHT = 7
+    A = 8
+
+KEY_MAP = {
+    ord(' '): Command.B,
+    ord('2'): Command.UNKNOWN,
+    ord('1'): Command.SELECT,
+    ord('0'): Command.START,
+    ord('w'): Command.UP,
+    ord('s'): Command.DOWN,
+    ord('a'): Command.LEFT,
+    ord('d'): Command.RIGHT,
+    ord('c'): Command.A
+}
+
+class Input():
+    def __init__(self, command):
+        self.command = command
+        self.time = time()
 
 class Controls:
-
-    KEY_MAP = {
-        ord(' '): 0,    # B
-        ord('2'): 1,    # 
-        ord('1'): 2,    # Select
-        ord('0'): 3,    # Start
-        ord('w'): 4,    # Up
-        ord('s'): 5,    # Down
-        ord('a'): 6,    # Left
-        ord('d'): 7,    # Right
-        ord('c'): 8     # A
-    }
-
     def __init__(self):
-        self.pressed_keys = set()
-        self.last_key_time = time()
-        self.buttons = []
-        self.clear_buttons()
+        self.inputs = []
+        self.buttons = [0] * 9
         self.quit = False
 
     def clear_buttons(self):
-        self.buttons = [0] * 9
+        self.buttons = [0] * 9  
+        self.inputs = []    
 
-    def input_buttons(self, input, ):
-        print(input)
-        self.clear_buttons()
-        for key in input:
-            if key in self.KEY_MAP:
-                self.buttons[self.KEY_MAP[key]] = 1
-                self.last_key_time = time()
+    def input_commands(self, commands):
+        for i, command in enumerate(commands):
+            self.inputs = [inp for inp in self.inputs if inp.command != command]
+            self.inputs.append(Input(command))
+            self.buttons[command.value] = 1
 
-    def update_buttons(self):
-        if time() - self.last_key_time > 0.05:
+    def update_inputs(self):
+        for input in self.inputs:
+            if time() - input.time > 0.1:
+                self.buttons[input.command.value] = 0
+                self.inputs.pop(0)
+            else:
+                break
+
+    def process_key(self, key):
+        if key != 255 and key in KEY_MAP:
             self.clear_buttons()
-
-    def update_manual_buttons(self):
-        self.update_buttons()
-
-        self.input_buttons(self.pressed_keys)
-
-        key = waitKey(1) & 0xFF
-        if key != 255:
-            self.pressed_keys.add(key)
-            self.last_key_time = time()
+            self.input_commands([KEY_MAP[key]])
 
         if key == ord('q'):
             self.quit = True
-
-        return self.buttons
