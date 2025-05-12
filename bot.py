@@ -20,7 +20,7 @@ class Bot:
         x_start, x_end = 0, width
         roi = frame[y_start:y_end, x_start:x_end]
 
-        self.player.identify(roi)
+        self.detect_player(roi)
         self.detect_objects(roi)
 
         self.action()
@@ -44,14 +44,22 @@ class Bot:
 
         for enemy in self.enemies:
             if self.player.is_aligned(enemy):
-                self.controls.input_commands([Command.B])
+                if self.player.is_aiming(enemy):
+                    self.controls.input_commands([Command.B])
+                elif self.player.x_diff(enemy) > 0:
+                    self.controls.input_commands([Command.RIGHT, Command.B])
+                elif self.player.x_diff(enemy) < 0:
+                    self.controls.input_commands([Command.LEFT, Command.B])
                 return
 
         for fuel in self.fuels:
-            if self.player.is_aligned(fuel):
-                self.controls.input_commands([Command.B])
+            if not self.player.is_aligned(fuel) and time.time() - self.start_time >= 7:
+                if self.player.x_diff(fuel) > 0:
+                    self.controls.input_commands([Command.RIGHT])
+                elif self.player.x_diff(fuel) < 0:
+                    self.controls.input_commands([Command.LEFT])
                 return
-
+            break
        
     def detect_objects(self, frame):
         frame = frame.copy()
@@ -112,37 +120,7 @@ class Bot:
 
         cv2.imshow("Detected Objects", frame)
 
-
-class Element:
-    def __init__(self, name, position, width):
-        self.name = name
-        self._position = position
-        self.width = width
-        self.left = position[0] - width // 2
-        self.right = position[0] + width // 2
-
-    @property
-    def position(self):
-        return self._position
-    
-    @position.setter
-    def position(self, value):
-        self._position = value
-        self.left = self._position[0] - self.width // 2
-        self.right = self._position[0] + self.width // 2
-    
-    def is_aligned(self, element):
-        return self.left <= element.left <= self.right or self.left <= element.right <= self.right
-
-
-class Player (Element):
-    def __init__(self, position = [0, 0]):
-        super().__init__("Player", position, 20)
-        self.position = position
-        self.present = False
-
-
-    def identify(self, frame):
+    def detect_player(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         lower_yellow = (20, 100, 100)
         upper_yellow = (30, 255, 255)
@@ -157,7 +135,7 @@ class Player (Element):
             x, y, w, h = cv2.boundingRect(cnt)
             area = cv2.contourArea(cnt)
 
-            if 260 < area < 400 and 15 < w < 25:
+            if 200 < area < 400 and 10 < w < 25:
                 area_diff = abs(area - 300)
                 if area_diff < best_area_diff:
                     best_match = (cnt, x + w // 2, y + h // 2)
@@ -165,18 +143,51 @@ class Player (Element):
 
         if best_match:
             cnt, center_x, center_y = best_match
-            self.position = [center_x, center_y]
+            self.player.position = [center_x, center_y]
             cv2.drawContours(frame, [cnt], -1, (0, 255, 0), 2)
-            self.present = True
+            self.player.present = True
+
+            x, y = self.player.position
+            cv2.circle(frame, self.player.position, radius=2, color=(0, 255, 0), thickness=-1)
+            cv2.line(frame, [x-self.player.width//2, y], [x+self.player.width//2, y], color=(255, 0, 255), thickness=2)
         else:
-            self.present = False
+            self.player.present = False
 
-        x, y = self.position
-        cv2.circle(frame, self.position, radius=2, color=(0, 255, 0), thickness=-1)
-        cv2.line(frame, [x-self.width//2, y], [x+self.width//2, y], color=(255, 0, 255), thickness=2)
 
-        cv2.imshow("Plane", frame)
+class Element:
+    def __init__(self, name, position, width, present=True):
+        self.name = name
+        self._position = position
+        self.width = width
+        self.left = position[0] - width // 2
+        self.right = position[0] + width // 2
+        self.present = present
 
+    @property
+    def position(self):
+        return self._position
+    
+    @position.setter
+    def position(self, value):
+        self._position = value
+        self.left = self._position[0] - self.width // 2
+        self.right = self._position[0] + self.width // 2
+    
+    def is_aligned(self, element):
+        return self.left <= element.left <= self.right or self.left <= element.right <= self.right
+    
+    def x_diff(self, element):
+        return element.position[0] - self.position[0]
+
+
+class Player (Element):
+    def __init__(self, position = [0, 0]):
+        super().__init__("Player", position, 20, present=(position != [0,0]))
+        self.position = position
+
+    def is_aiming (self, element):
+        THICKNESS = 1
+        return self.position[0]-THICKNESS <= element.left <= self.position[0]+THICKNESS or self.position[0]-THICKNESS <= element.right <= self.position[0]+THICKNESS
 
 class Enemy (Element):
     def __init__(self, name, position, width):
