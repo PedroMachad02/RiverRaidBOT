@@ -2,3 +2,4 @@ stable-retro
 opencv-python
 numpy
 keyboard
+argparse

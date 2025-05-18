@@ -46,11 +46,9 @@ class Bot:
             direction = -1
 
         if self.will_move is False and self.player.x_diff(element) * direction > 0 and self.player.can_move_right:
-            print(element.name, avoid)
             self.controls.input_commands([Command.RIGHT])
             self.will_move = True
         elif self.will_move is False and self.player.x_diff(element) * direction < 0 and self.player.can_move_left:
-            print(element.name, avoid)
             self.controls.input_commands([Command.LEFT])
             self.will_move = True
 

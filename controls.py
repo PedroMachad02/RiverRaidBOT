@@ -42,12 +42,10 @@ class Controls:
 
     def input_commands(self, commands, hold=True):
         for i, command in enumerate(commands):
-            lengthBefore = len(self.inputs)
             if hold is True:
                 self.inputs = [inp for inp in self.inputs if inp.command != command]
-            lengthAfter = len(self.inputs)
 
-            if (hold is True) or (self.buttons[command.value] == 0 and lengthBefore == lengthAfter):
+            if hold is True or self.buttons[command.value] == 0:
                 self.inputs.append(Input(command))
                 self.buttons[command.value] = 1
 
