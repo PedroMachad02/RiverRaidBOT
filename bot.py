@@ -39,12 +39,16 @@ class Bot:
     def fire (self):
         self.controls.input_commands([Command.B], hold=False)
 
-    def move_to_element (self, element):
-        print(element.name)
-        if self.will_move is False and self.player.x_diff(element) > 0 and self.player.can_move_right:
+    def move_to_element (self, element, avoid = False):
+        print(element.name, avoid)
+        direction = 1
+        if avoid:
+            direction = -1
+
+        if self.will_move is False and self.player.x_diff(element) * direction > 0 and self.player.can_move_right:
             self.controls.input_commands([Command.RIGHT])
             self.will_move = True
-        elif self.will_move is False and self.player.x_diff(element) < 0 and self.player.can_move_left:
+        elif self.will_move is False and self.player.x_diff(element) * direction < 0 and self.player.can_move_left:
             self.controls.input_commands([Command.LEFT])
             self.will_move = True
 
@@ -61,25 +65,31 @@ class Bot:
         # Handle enemies
         self.enemies.sort(key=lambda e: e.position[1], reverse=True)
         for enemy in self.enemies:
-            if self.player.is_aiming(enemy) or self.player.is_aligned(enemy, margin=3):
+            if self.player.is_aiming(enemy):
                 self.fire()
                 self.move_to_element(enemy)
-            elif self.player.is_aligned(enemy, margin=5):
+                break
+            elif self.player.is_aligned(enemy, margin=3) and self.player.y_diff(enemy) > 40:
                 self.fire()
                 self.move_to_element(enemy)
+                break
+            elif self.player.is_aligned(enemy, margin=10) and self.player.y_diff(enemy) < 40:
+                self.move_to_element(enemy, avoid=True)
+
 
         # Handle valid passings
         self.passings.sort(key=lambda p: abs(self.player.x_diff(p)))
         for passing in self.passings:
             if passing.includes(self.player):
                 if abs(self.player.x_diff(passing)) > 20:
+                    self.move_to_element(passing)
+                    break
+                else:
                     self.fuels.sort(key=lambda f: f.position[1], reverse=True)
                     for fuel in self.fuels:
-                        if self.player.is_aligned(fuel) or self.player.y_diff(fuel) > 50 and abs(self.player.x_diff(fuel)) < 30:
+                        if (self.player.is_aligned(fuel, margin=10) and not self.player.is_aiming(fuel)) or (self.player.y_diff(fuel) > 50 and abs(self.player.x_diff(fuel)) < 30):
                             self.move_to_element(fuel)
                             break
-                    self.move_to_element(passing)
-                break
             elif passing.is_aligned(self.player):
                 self.move_to_element(passing)
             else:
@@ -214,15 +224,20 @@ class Bot:
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         lower_green = np.array([35, 40, 40])
         upper_green = np.array([85, 255, 255])
+        lower_gray = np.array([0, 0, 50])
+        upper_gray = np.array([180, 50, 200])
+
         green_mask = cv2.inRange(hsv, lower_green, upper_green)
+        gray_mask = cv2.inRange(hsv, lower_gray, upper_gray)
+        outside_mask = cv2.bitwise_or(green_mask, gray_mask)
 
         # Fill small holes in the green areas using morphological closing
-        kernel = np.ones((5, 5), np.uint8)  # Adjust if needed
-        closed_green = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel)
+        kernel = np.ones((20, 20), np.uint8) 
+        closed_outside = cv2.morphologyEx(outside_mask, cv2.MORPH_CLOSE, kernel)
 
         # Row to analyze
         y = 270
-        row = closed_green[y]
+        row = closed_outside[y]
 
         # Collect non-green segments
         self.passings = []
