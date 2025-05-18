@@ -61,6 +61,11 @@ class Boat (Enemy):
         x, y = position
         super().__init__("Boat", [x, y], width=50)
 
+class Plane (Enemy):
+    def __init__(self, position):
+        x, y = position
+        super().__init__("Plane", [x, y], width=25)
+
 
 class Fuel (Element):
     def __init__(self, position):

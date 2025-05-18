@@ -7,11 +7,6 @@ from bot import Bot
 from controls import Controls
 
 
-def init_game():
-    game = retro.RetroEmulator("river-raid.a26")
-    return game
-
-
 def get_frame(game):
     frame = game.get_screen()
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) # Convert the screen to BGR format
@@ -25,10 +20,9 @@ def display_screen(title, frame):
 
 
 def main ():
-    game = init_game()
+    game = retro.RetroEmulator("river-raid.a26")
 
-    
-    state_path = "saved_state.bin"
+    state_path = "states/saved_state.bin"
     game_load = False
     if os.path.exists(state_path):
         with open(state_path, "rb") as f:
@@ -45,8 +39,8 @@ def main ():
         key = cv2.waitKey(1)
 
         frame = get_frame(game)
-        bot.refresh(frame)
         display_screen("River Raid", frame)
+        bot.refresh(frame)
 
         controls.process_key(key)
         controls.update_inputs()
@@ -54,6 +48,7 @@ def main ():
         if controls.save:
             with open(state_path, "wb") as f:
                 f.write(game.get_state())
+            controls.save = False
         if controls.quit:
             break
 

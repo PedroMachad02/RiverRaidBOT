@@ -3,7 +3,7 @@ import time
 import numpy as np
 
 from controls import Command
-from elements import Player, Helicopter, Boat, Fuel, Passing
+from elements import Player, Helicopter, Boat, Plane, Fuel, Passing
 
 class Bot:
     def __init__(self, controls, auto_start=False):
@@ -27,6 +27,7 @@ class Bot:
         self.detect_player(roi)
         self.detect_objects(roi)
         self.detect_passings(roi)
+        cv2.imshow("Detected Objects", roi)
 
         # Act based on entities
         self.action()
@@ -40,15 +41,16 @@ class Bot:
         self.controls.input_commands([Command.B], hold=False)
 
     def move_to_element (self, element, avoid = False):
-        print(element.name, avoid)
         direction = 1
         if avoid:
             direction = -1
 
         if self.will_move is False and self.player.x_diff(element) * direction > 0 and self.player.can_move_right:
+            print(element.name, avoid)
             self.controls.input_commands([Command.RIGHT])
             self.will_move = True
         elif self.will_move is False and self.player.x_diff(element) * direction < 0 and self.player.can_move_left:
+            print(element.name, avoid)
             self.controls.input_commands([Command.LEFT])
             self.will_move = True
 
@@ -69,11 +71,10 @@ class Bot:
                 self.fire()
                 self.move_to_element(enemy)
                 break
-            elif self.player.is_aligned(enemy, margin=3) and self.player.y_diff(enemy) > 40:
-                self.fire()
+            elif self.player.is_aligned(enemy, margin=5) and self.player.y_diff(enemy) > 50:
                 self.move_to_element(enemy)
                 break
-            elif self.player.is_aligned(enemy, margin=10) and self.player.y_diff(enemy) < 40:
+            elif self.player.is_aligned(enemy, margin=25) and self.player.y_diff(enemy) < 50:
                 self.move_to_element(enemy, avoid=True)
 
 
@@ -84,7 +85,7 @@ class Bot:
                 if abs(self.player.x_diff(passing)) > 20:
                     self.move_to_element(passing)
                     break
-                else:
+                elif abs(self.player.x_diff(passing)) < 15:
                     self.fuels.sort(key=lambda f: f.position[1], reverse=True)
                     for fuel in self.fuels:
                         if (self.player.is_aligned(fuel, margin=10) and not self.player.is_aiming(fuel)) or (self.player.y_diff(fuel) > 50 and abs(self.player.x_diff(fuel)) < 30):
@@ -98,12 +99,11 @@ class Bot:
 
        
     def detect_objects(self, frame):
-        frame = frame.copy()
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
         # Define color ranges for objects in HSV
         color_ranges = {
-            "ENEMY": {
+            "HELICOPTER": {
                 "color": [(50, 100, 50), (90, 255, 255)], # Green-ish
                 "area": [50,53]
             },     
@@ -114,6 +114,10 @@ class Bot:
             "BOAT": {
                 "color": [(0, 180, 150), (10, 255, 255)],  # Red middle of boat
                 "area": [200, 250]
+            },
+            "PLANE": {
+                "color": [(100, 50, 100), (140, 150, 255)], #Light blue
+                "area": [120, 130]
             }
         }
 
@@ -134,12 +138,15 @@ class Bot:
                     cv2.drawContours(frame, [cnt], -1, (255, 255, 255), 1)
                     cv2.putText(frame, f"{label}, {w}, {h}, {area}", (x, y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
 
-                    if label == "ENEMY":
+                    if label == "HELICOPTER":
                         self.enemies.append(Helicopter(position))
                     elif label == "FUEL":
                         self.fuels.append(Fuel(position))
                     elif label == "BOAT":
                         self.enemies.append(Boat(position))
+                    elif label == "PLANE":
+                        self.enemies.append(Plane(position))
+
 
 
         for enemy in self.enemies:            
@@ -154,7 +161,6 @@ class Bot:
             cv2.circle(frame, position, radius=2, color=(0, 255, 0), thickness=-1)
             cv2.line(frame, [x-width//2, y], [x+width//2, y], color=(255, 0, 255), thickness=2)
 
-        cv2.imshow("Detected Objects", frame)
 
     def detect_player(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -180,14 +186,13 @@ class Bot:
         if best_match:
             cnt, center_x, center_y = best_match
             self.player.position = [center_x, center_y]
-            cv2.drawContours(frame, [cnt], -1, (0, 255, 0), 2)
             self.player.present = True
 
             x, y = self.player.position
             cv2.circle(frame, self.player.position, radius=2, color=(0, 255, 0), thickness=-1)
             cv2.line(frame, [x-self.player.width//2, y], [x+self.player.width//2, y], color=(255, 0, 255), thickness=2)
 
-            # Define green HSV range
+            # Define movement limits
             lower_blue = np.array([100, 100, 100])
             upper_blue = np.array([140, 255, 255])
             blue_mask = cv2.inRange(hsv, lower_blue, upper_blue)
@@ -207,14 +212,14 @@ class Bot:
 
             # Optional: draw indicators
             if self.player.can_move_left:
-                cv2.circle(frame, (left_x, y), 3, (255, 255, 0), -1)  # Cyan
+                cv2.circle(frame, (left_x, y), 3, (255, 255, 0), -1)
             else:
-                cv2.circle(frame, (left_x, y), 3, (0, 0, 255), -1)    # Red (blocked)
+                cv2.circle(frame, (left_x, y), 3, (0, 0, 255), -1)  
 
             if self.player.can_move_right:
-                cv2.circle(frame, (right_x, y), 3, (0, 255, 255), -1)  # Yellow
+                cv2.circle(frame, (right_x, y), 3, (255, 255, 0), -1)  
             else:
-                cv2.circle(frame, (right_x, y), 3, (0, 0, 255), -1)    # Red (blocked)
+                cv2.circle(frame, (right_x, y), 3, (0, 0, 255), -1)  
         else:
             self.player.can_move_left = True
             self.player.can_move_right = True
@@ -244,10 +249,10 @@ class Bot:
         start = None
 
         for x in range(len(row)):
-            if row[x] == 0:  # Not green => part of line
+            if row[x] == 0:  # Part of the passing
                 if start is None:
                     start = x
-                cv2.circle(frame, (x, y), radius=1, color=(0, 255, 255), thickness=-1)  # Yellow dot
+                cv2.circle(frame, (x, y), radius=1, color=(0, 255, 255), thickness=1)
             else:
                 if start is not None:
                     self.passings.append(Passing(start, x - 1))
