@@ -34,20 +34,26 @@ class Controls:
         self.inputs = []
         self.buttons = [0] * 9
         self.quit = False
+        self.save = False
 
     def clear_buttons(self):
         self.buttons = [0] * 9  
         self.inputs = []    
 
-    def input_commands(self, commands):
+    def input_commands(self, commands, hold=True):
         for i, command in enumerate(commands):
-            self.inputs = [inp for inp in self.inputs if inp.command != command]
-            self.inputs.append(Input(command))
-            self.buttons[command.value] = 1
+            lengthBefore = len(self.inputs)
+            if hold is True:
+                self.inputs = [inp for inp in self.inputs if inp.command != command]
+            lengthAfter = len(self.inputs)
+
+            if (hold is True) or (self.buttons[command.value] == 0 and lengthBefore == lengthAfter):
+                self.inputs.append(Input(command))
+                self.buttons[command.value] = 1
 
     def update_inputs(self):
         for input in self.inputs:
-            if time() - input.time > 0.1:
+            if time() - input.time > 0.001:
                 self.buttons[input.command.value] = 0
                 self.inputs.pop(0)
             else:
@@ -60,3 +66,6 @@ class Controls:
 
         if key == ord('q'):
             self.quit = True
+        
+        if key == ord('p'):
+            self.save = True

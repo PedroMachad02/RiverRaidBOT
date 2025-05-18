@@ -3,63 +3,89 @@ import time
 import numpy as np
 
 from controls import Command
+from elements import Player, Helicopter, Boat, Fuel, Passing
 
 class Bot:
-    def __init__(self, controls):
+    def __init__(self, controls, auto_start=False):
         self.controls = controls
         self.player = Player()
+        self.will_move = False
         self.enemies = []
         self.fuels = []
-        self.started = False
-        self.running = False
+        self.passings = []
+        self.started = auto_start
         self.start_time = time.time() 
 
     def refresh (self, frame):
+        # Define Region Of Interest
         height, width = frame.shape[:2]
         y_start, y_end = 0, 480
         x_start, x_end = 0, width
         roi = frame[y_start:y_end, x_start:x_end]
 
+        # Detect all entities in roi
         self.detect_player(roi)
         self.detect_objects(roi)
+        self.detect_passings(roi)
 
+        # Act based on entities
         self.action()
 
+        # Clear all entities
         self.enemies = []
         self.fuels = []
+        self.passings = []
+
+    def fire (self):
+        self.controls.input_commands([Command.B], hold=False)
+
+    def move_to_element (self, element):
+        print(element.name)
+        if self.will_move is False and self.player.x_diff(element) > 0 and self.player.can_move_right:
+            self.controls.input_commands([Command.RIGHT])
+            self.will_move = True
+        elif self.will_move is False and self.player.x_diff(element) < 0 and self.player.can_move_left:
+            self.controls.input_commands([Command.LEFT])
+            self.will_move = True
 
     def action (self):
+        self.will_move = False
+
+        # Start game
         if not self.started and time.time() - self.start_time >= 3:
             self.controls.input_commands([Command.START])
             self.started = True
-            return
         elif not self.started:
             return
-        elif not self.running and self.player.present:
-            self.controls.input_commands([Command.B])
-            self.running = True
-            return
-        elif not self.running:
-            return
 
+        # Handle enemies
+        self.enemies.sort(key=lambda e: e.position[1], reverse=True)
         for enemy in self.enemies:
-            if self.player.is_aligned(enemy):
-                if self.player.is_aiming(enemy):
-                    self.controls.input_commands([Command.B])
-                elif self.player.x_diff(enemy) > 0:
-                    self.controls.input_commands([Command.RIGHT, Command.B])
-                elif self.player.x_diff(enemy) < 0:
-                    self.controls.input_commands([Command.LEFT, Command.B])
-                return
+            if self.player.is_aiming(enemy) or self.player.is_aligned(enemy, margin=3):
+                self.fire()
+                self.move_to_element(enemy)
+            elif self.player.is_aligned(enemy, margin=5):
+                self.fire()
+                self.move_to_element(enemy)
 
-        for fuel in self.fuels:
-            if not self.player.is_aligned(fuel) and time.time() - self.start_time >= 7:
-                if self.player.x_diff(fuel) > 0:
-                    self.controls.input_commands([Command.RIGHT])
-                elif self.player.x_diff(fuel) < 0:
-                    self.controls.input_commands([Command.LEFT])
-                return
+        # Handle valid passings
+        self.passings.sort(key=lambda p: abs(self.player.x_diff(p)))
+        for passing in self.passings:
+            if passing.includes(self.player):
+                if abs(self.player.x_diff(passing)) > 20:
+                    self.fuels.sort(key=lambda f: f.position[1], reverse=True)
+                    for fuel in self.fuels:
+                        if self.player.is_aligned(fuel) or self.player.y_diff(fuel) > 50 and abs(self.player.x_diff(fuel)) < 30:
+                            self.move_to_element(fuel)
+                            break
+                    self.move_to_element(passing)
+                break
+            elif passing.is_aligned(self.player):
+                self.move_to_element(passing)
+            else:
+                self.move_to_element(passing)
             break
+
        
     def detect_objects(self, frame):
         frame = frame.copy()
@@ -150,61 +176,70 @@ class Bot:
             x, y = self.player.position
             cv2.circle(frame, self.player.position, radius=2, color=(0, 255, 0), thickness=-1)
             cv2.line(frame, [x-self.player.width//2, y], [x+self.player.width//2, y], color=(255, 0, 255), thickness=2)
+
+            # Define green HSV range
+            lower_blue = np.array([100, 100, 100])
+            upper_blue = np.array([140, 255, 255])
+            blue_mask = cv2.inRange(hsv, lower_blue, upper_blue)
+
+            # Check left/right based on green presence
+            x, y = self.player.position
+            offset = self.player.width // 2 + 18
+
+            frame_height, frame_width = frame.shape[:2]
+            left_x = max(0, x - offset)
+            right_x = min(frame_width - 1, x + offset)
+            y = min(max(0, y), frame_height - 1) - 18
+
+            # If pixel is NOT green, movement is allowed
+            self.player.can_move_left = blue_mask[y, left_x] > 0
+            self.player.can_move_right = blue_mask[y, right_x] > 0
+
+            # Optional: draw indicators
+            if self.player.can_move_left:
+                cv2.circle(frame, (left_x, y), 3, (255, 255, 0), -1)  # Cyan
+            else:
+                cv2.circle(frame, (left_x, y), 3, (0, 0, 255), -1)    # Red (blocked)
+
+            if self.player.can_move_right:
+                cv2.circle(frame, (right_x, y), 3, (0, 255, 255), -1)  # Yellow
+            else:
+                cv2.circle(frame, (right_x, y), 3, (0, 0, 255), -1)    # Red (blocked)
         else:
+            self.player.can_move_left = True
+            self.player.can_move_right = True
             self.player.present = False
 
+    def detect_passings(self, frame):
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        lower_green = np.array([35, 40, 40])
+        upper_green = np.array([85, 255, 255])
+        green_mask = cv2.inRange(hsv, lower_green, upper_green)
 
-class Element:
-    def __init__(self, name, position, width, present=True):
-        self.name = name
-        self._position = position
-        self.width = width
-        self.left = position[0] - width // 2
-        self.right = position[0] + width // 2
-        self.present = present
+        # Fill small holes in the green areas using morphological closing
+        kernel = np.ones((5, 5), np.uint8)  # Adjust if needed
+        closed_green = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel)
 
-    @property
-    def position(self):
-        return self._position
-    
-    @position.setter
-    def position(self, value):
-        self._position = value
-        self.left = self._position[0] - self.width // 2
-        self.right = self._position[0] + self.width // 2
-    
-    def is_aligned(self, element):
-        return self.left <= element.left <= self.right or self.left <= element.right <= self.right
-    
-    def x_diff(self, element):
-        return element.position[0] - self.position[0]
+        # Row to analyze
+        y = 270
+        row = closed_green[y]
+
+        # Collect non-green segments
+        self.passings = []
+        start = None
+
+        for x in range(len(row)):
+            if row[x] == 0:  # Not green => part of line
+                if start is None:
+                    start = x
+                cv2.circle(frame, (x, y), radius=1, color=(0, 255, 255), thickness=-1)  # Yellow dot
+            else:
+                if start is not None:
+                    self.passings.append(Passing(start, x - 1))
+                    start = None
+
+        # If segment reaches the end
+        if start is not None:
+            self.passings.append(Passing(start, len(row) - 1))
 
 
-class Player (Element):
-    def __init__(self, position = [0, 0]):
-        super().__init__("Player", position, 20, present=(position != [0,0]))
-        self.position = position
-
-    def is_aiming (self, element):
-        THICKNESS = 1
-        return self.position[0]-THICKNESS <= element.left <= self.position[0]+THICKNESS or self.position[0]-THICKNESS <= element.right <= self.position[0]+THICKNESS
-
-class Enemy (Element):
-    def __init__(self, name, position, width):
-        super().__init__(name, position, width)
-
-class Helicopter (Enemy):
-    def __init__(self, position):
-        x, y = position
-        super().__init__("Helicopter", [x-5, y], width=30)
-
-class Boat (Enemy):
-    def __init__(self, position):
-        x, y = position
-        super().__init__("Boat", [x, y], width=50)
-
-class Fuel (Element):
-    def __init__(self, position):
-        super().__init__("Fuel", position, width=20)
-
-    
