@@ -99,74 +99,47 @@ class Bot:
     def detect_objects(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-        # Define color ranges for objects in HSV
-        color_ranges = {
-            "HELICOPTER": {
-                "color": [(50, 100, 50), (90, 255, 255)], # Green-ish
-                "area": [50,53]
-            },     
-            "FUEL":  { 
-                "color": [(0, 100, 100), (5, 255, 255)], # Red-ish (fuel top and bottom)
-                "area": [229, 229]
-            },    
-            "BOAT": {
-                "color": [(0, 180, 150), (10, 255, 255)],  # Red middle of boat
-                "area": [200, 250]
-            },
-            "PLANE": {
-                "color": [(100, 50, 100), (140, 150, 255)], #Light blue
-                "area": [120, 130]
-            }
-        }
+        # Define objects to be identified
+        object_classes = [Helicopter, Plane, Boat, Fuel]
+        objects = [cls([0,0]) for cls in object_classes]
 
-        for label, data in color_ranges.items():
-            lower, upper = data["color"]
-            area_min, area_max = data["area"]
-
+        for object in objects: # Detect all shapes that match the color mask
+            lower, upper = object.color
             mask = cv2.inRange(hsv, np.array(lower), np.array(upper))
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
             for cnt in contours:
                 area = cv2.contourArea(cnt)
-                
-                if area > 30 and area_min <= area <= area_max:
+                area_min, area_max = object.area
+
+                if area > 30 and area_min <= area <= area_max: # Validate shape using area and create instance
+                    cv2.drawContours(frame, [cnt], -1, (255, 255, 255), 1) # Draw object rectangle
                     x, y, w, h = cv2.boundingRect(cnt)
                     position = [x + w // 2, y + h // 2]
-
-                    cv2.drawContours(frame, [cnt], -1, (255, 255, 255), 1)
-                    cv2.putText(frame, f"{label}, {w}, {h}, {area}", (x, y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
-
-                    if label == "HELICOPTER":
+                    if isinstance(object, Helicopter):
                         self.enemies.append(Helicopter(position))
-                    elif label == "FUEL":
+                    elif isinstance(object, Fuel):
                         self.fuels.append(Fuel(position))
-                    elif label == "BOAT":
+                    elif isinstance(object, Boat):
                         self.enemies.append(Boat(position))
-                    elif label == "PLANE":
+                    elif isinstance(object, Plane):
                         self.enemies.append(Plane(position))
 
-
-
-        for enemy in self.enemies:            
-            width = enemy.width
-            x, y = enemy.position
+        # Draw object identification
+        all_objects = (x for lst in (self.enemies, self.fuels) for x in lst)
+        for object in all_objects:            
+            x, y = object.position
+            cv2.putText(frame, f"{object.name}", (x, y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
             cv2.circle(frame, position, radius=2, color=(0, 255, 0), thickness=-1)
-            cv2.line(frame, [x-width//2, y], [x+width//2, y], color=(255, 0, 255), thickness=2)
-
-        for fuel in self.fuels:
-            width = fuel.width
-            x, y = fuel.position
-            cv2.circle(frame, position, radius=2, color=(0, 255, 0), thickness=-1)
-            cv2.line(frame, [x-width//2, y], [x+width//2, y], color=(255, 0, 255), thickness=2)
+            cv2.line(frame, [object.left, y], [object.right, y], color=(255, 0, 255), thickness=2)
 
 
     def detect_player(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        lower_yellow = (20, 100, 100)
-        upper_yellow = (30, 255, 255)
-        yellow_mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
 
-        contours, _ = cv2.findContours(yellow_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        lower, upper = self.player.color
+        mask = cv2.inRange(hsv, lower, upper)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         best_match = None
         best_area_diff = float("inf")
@@ -174,9 +147,12 @@ class Bot:
         for cnt in contours:
             x, y, w, h = cv2.boundingRect(cnt)
             area = cv2.contourArea(cnt)
+            area_min, area_max = self.player.area
+            w_min = self.player.width - 5
+            w_max = self.player.width + 5
 
-            if 200 < area < 400 and 10 < w < 25:
-                area_diff = abs(area - 300)
+            if area_min <= area <= area_max and w_min <= w <= w_max:
+                area_diff = abs(area - ((area_max - area_min) / 2))
                 if area_diff < best_area_diff:
                     best_match = (cnt, x + w // 2, y + h // 2)
                     best_area_diff = area_diff
@@ -185,10 +161,11 @@ class Bot:
             cnt, center_x, center_y = best_match
             self.player.position = [center_x, center_y]
             self.player.present = True
+            
 
             x, y = self.player.position
-            cv2.circle(frame, self.player.position, radius=2, color=(0, 255, 0), thickness=-1)
-            cv2.line(frame, [x-self.player.width//2, y], [x+self.player.width//2, y], color=(255, 0, 255), thickness=2)
+            cv2.circle(frame, [x, y], radius=1, color=(0, 255, 0), thickness=1)
+            cv2.line(frame, [self.player.left, y], [self.player.right, y], color=(255, 0, 255), thickness=2)
 
             # Define movement limits
             lower_blue = np.array([100, 100, 100])
@@ -204,16 +181,15 @@ class Bot:
             right_x = min(frame_width - 1, x + offset)
             y = min(max(0, y), frame_height - 1) - 18
 
-            # If pixel is NOT green, movement is allowed
+            # If pixel is blue, movement is allowed
             self.player.can_move_left = blue_mask[y, left_x] > 0
             self.player.can_move_right = blue_mask[y, right_x] > 0
 
-            # Optional: draw indicators
+            # Draw indicators
             if self.player.can_move_left:
                 cv2.circle(frame, (left_x, y), 3, (255, 255, 0), -1)
             else:
                 cv2.circle(frame, (left_x, y), 3, (0, 0, 255), -1)  
-
             if self.player.can_move_right:
                 cv2.circle(frame, (right_x, y), 3, (255, 255, 0), -1)  
             else:
@@ -225,6 +201,7 @@ class Bot:
 
     def detect_passings(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        
         lower_green = np.array([35, 40, 40])
         upper_green = np.array([85, 255, 255])
         lower_gray = np.array([0, 0, 50])

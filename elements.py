@@ -32,6 +32,9 @@ class Element:
 
 
 class Player (Element):
+    color = [(20, 100, 100), (30, 255, 255)]
+    area = [200, 400] 
+
     def __init__(self, position = [0, 0]):
         super().__init__("Player", position, 20, present=(position != [0,0]))
         self.position = position
@@ -49,25 +52,36 @@ class Player (Element):
 class Enemy (Element):
     def __init__(self, name, position, width):
         super().__init__(name, position, width)
+        
 
 
 class Helicopter (Enemy):
+    color = [(50, 100, 50), (90, 255, 255)] # Dark Green
+    area = [50, 53]
+
     def __init__(self, position):
         x, y = position
         super().__init__("Helicopter", [x-2, y], width=30)
 
 class Boat (Enemy):
+    color = [(0, 180, 150), (10, 255, 255)] # Dark Red
+    area = [200, 250]
+
     def __init__(self, position):
-        x, y = position
-        super().__init__("Boat", [x, y], width=50)
+        super().__init__("Boat", position, width=50)
 
 class Plane (Enemy):
+    color = [(100, 50, 100), (140, 150, 255)] # Light Blue
+    area = [120, 130]
+
     def __init__(self, position):
-        x, y = position
-        super().__init__("Plane", [x, y], width=25)
+        super().__init__("Plane", position, width=25)
 
 
 class Fuel (Element):
+    color = [(0, 100, 100), (5, 255, 255)] # Light Red
+    area = [229, 229]
+
     def __init__(self, position):
         super().__init__("Fuel", position, width=20)
 
