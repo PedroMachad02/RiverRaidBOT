@@ -25,7 +25,8 @@ class Bot:
 
         # Detect all entities in roi
         self.detect_player(roi)
-        self.detect_objects(roi)
+        enemies, self.fuels = self.detect_objects(roi)
+        self.enemies = self.keep_same(self.enemies, enemies)
         self.detect_passings(roi)
         cv2.imshow("Detected Objects", roi)
 
@@ -33,7 +34,6 @@ class Bot:
         self.action()
 
         # Clear all entities
-        self.enemies = []
         self.fuels = []
         self.passings = []
 
@@ -99,6 +99,9 @@ class Bot:
     def detect_objects(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
+        enemies = []
+        fuels = []
+
         # Define objects to be identified
         object_classes = [Helicopter, Plane, Boat, Fuel]
         objects = [cls([0,0]) for cls in object_classes]
@@ -117,21 +120,23 @@ class Bot:
                     x, y, w, h = cv2.boundingRect(cnt)
                     position = [x + w // 2, y + h // 2]
                     if isinstance(object, Helicopter):
-                        self.enemies.append(Helicopter(position))
+                        enemies.append(Helicopter(position))
                     elif isinstance(object, Fuel):
-                        self.fuels.append(Fuel(position))
+                        fuels.append(Fuel(position))
                     elif isinstance(object, Boat):
-                        self.enemies.append(Boat(position))
+                        enemies.append(Boat(position))
                     elif isinstance(object, Plane):
-                        self.enemies.append(Plane(position))
+                        enemies.append(Plane(position))
 
         # Draw object identification
-        all_objects = (x for lst in (self.enemies, self.fuels) for x in lst)
+        all_objects = (x for lst in (enemies, fuels) for x in lst)
         for object in all_objects:            
             x, y = object.position
             cv2.putText(frame, f"{object.name}", (x, y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
             cv2.circle(frame, position, radius=2, color=(0, 255, 0), thickness=-1)
             cv2.line(frame, [object.left, y], [object.right, y], color=(255, 0, 255), thickness=2)
+
+        return enemies, fuels
 
 
     def detect_player(self, frame):
@@ -237,4 +242,12 @@ class Bot:
         if start is not None:
             self.passings.append(Passing(start, len(row) - 1))
 
+    def keep_same(self, old, new):
+        result = []
+        for new_item in new:
+            match = next((old_item for old_item in old if old_item.is_same(new_item)), None)
+            if match:
+                match.position = new_item.position
+            result.append(match if match else new_item)
+        return result
 

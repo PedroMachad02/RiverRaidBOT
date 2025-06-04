@@ -29,6 +29,9 @@ class Element:
     
     def y_diff(self, element):
         return self.position[1] - element.position[1]
+    
+    def is_same (self, element):
+        return self.name == element.name and abs(self.position[0] - element.position[0]) < 5 and abs(self.position[1] - element.position[1]) < 5
 
 
 class Player (Element):
