@@ -73,11 +73,12 @@ def main ():
         bot.refresh(frame)
 
         # Update controls + manual input
-        controls.process_key(key)
         controls.update_inputs()
+        controls.process_key(key)
         game.set_button_mask(controls.buttons)
         if controls.save:
             save_state(game, args.state)
+            controls.save = False
         if controls.quit:
             break
 

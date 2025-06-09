@@ -3,7 +3,7 @@ import time
 import numpy as np
 
 from controls import Command
-from elements import Player, Helicopter, Boat, Plane, Fuel, Passing
+from elements import Bridge, Player, Helicopter, Boat, Plane, Fuel, Passing
 
 class Bot:
     def __init__(self, controls, auto_start=False):
@@ -38,6 +38,8 @@ class Bot:
         self.passings = []
 
     def fire (self):
+        if self.controls.manual:
+            return
         self.controls.input_commands([Command.B], hold=False)
 
     def move_to_element (self, element, avoid = False):
@@ -45,6 +47,11 @@ class Bot:
         if avoid:
             direction = -1
 
+        if self.controls.manual:
+            return
+        if element.name == "Plane":
+            return
+        
         if self.will_move is False and self.player.x_diff(element) * direction > 0 and self.player.can_move_right:
             self.controls.input_commands([Command.RIGHT])
             self.will_move = True
@@ -65,10 +72,19 @@ class Bot:
         # Handle enemies
         self.enemies.sort(key=lambda e: e.position[1], reverse=True)
         for enemy in self.enemies:
+            if enemy.name == "Bridge":
+                if self.player.is_aligned(enemy, margin=50):
+                    self.fire()
+
             if self.player.is_aiming(enemy):
-                self.fire()
-                self.move_to_element(enemy)
-                break
+                fuel_ahead = False
+                for fuel in self.fuels:
+                    if self.player.is_aligned(fuel) and fuel.position[1] > enemy.position[1]:
+                        fuel_ahead = True
+                if not fuel_ahead:
+                    self.fire()
+                    self.move_to_element(enemy)
+                    break
             elif self.player.is_aligned(enemy, margin=5) and self.player.y_diff(enemy) > 50:
                 self.move_to_element(enemy)
                 break
@@ -103,7 +119,7 @@ class Bot:
         fuels = []
 
         # Define objects to be identified
-        object_classes = [Helicopter, Plane, Boat, Fuel]
+        object_classes = [Helicopter, Plane, Boat, Fuel, Bridge]
         objects = [cls([0,0]) for cls in object_classes]
 
         for object in objects: # Detect all shapes that match the color mask
@@ -127,6 +143,8 @@ class Bot:
                         enemies.append(Boat(position))
                     elif isinstance(object, Plane):
                         enemies.append(Plane(position))
+                    elif isinstance(object, Bridge):
+                        enemies.append(Bridge(position))
 
         # Draw object identification
         all_objects = (x for lst in (enemies, fuels) for x in lst)

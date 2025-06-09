@@ -80,6 +80,9 @@ class Plane (Enemy):
     def __init__(self, position):
         super().__init__("Plane", position, width=25)
 
+    def expected_x_collision(self, player):
+        return 50
+
 
 class Fuel (Element):
     color = [(0, 100, 100), (5, 255, 255)] # Light Red
@@ -95,3 +98,10 @@ class Passing (Element):
     
     def includes (self, element):
         return self.left <= element.left and self.right >= element.right
+    
+class Bridge (Enemy):
+    color = [(20, 143, 147), (40, 223, 227)] # Dark yellow
+    area = [200, 1000]
+
+    def __init__(self, position):
+        super().__init__("Bridge", position, width=100)

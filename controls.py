@@ -35,6 +35,7 @@ class Controls:
         self.buttons = [0] * 9
         self.quit = False
         self.save = False
+        self.manual = False
 
     def clear_buttons(self):
         self.buttons = [0] * 9  
@@ -49,7 +50,7 @@ class Controls:
                 self.inputs.append(Input(command))
                 self.buttons[command.value] = 1
 
-    def update_inputs(self):
+    def update_inputs(self):        
         for input in self.inputs:
             if time() - input.time > 0.001:
                 self.buttons[input.command.value] = 0
@@ -67,3 +68,6 @@ class Controls:
         
         if key == ord('p'):
             self.save = True
+
+        if key == ord('m'):
+            self.manual = not self.manual
