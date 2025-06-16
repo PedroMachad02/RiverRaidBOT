@@ -1,3 +1,5 @@
+import numpy as np
+
 class Element:
     def __init__(self, name, position, width, present=True):
         self.name = name
@@ -78,10 +80,69 @@ class Plane (Enemy):
     area = [120, 130]
 
     def __init__(self, position):
+        self.predicted_x_at_y0 = 0
+        self.ground_y = 450  # Bottom of the screen (reversed y-axis)
+
         super().__init__("Plane", position, width=25)
 
-    def expected_x_collision(self, player):
-        return 50
+        self.dt = 1.0
+
+        # Initial Kalman state: [x, y, vx, vy]
+        self.x_est = np.array([[position[0]],  # x
+                               [position[1]],  # y
+                               [0.0],          # vx
+                               [0.0]])         # vy
+
+        # State transition matrix
+        self.A = np.array([[1, 0, self.dt, 0],
+                           [0, 1, 0, self.dt],
+                           [0, 0, 1, 0],
+                           [0, 0, 0, 1]])
+
+        # Measurement matrix: we observe [x, y]
+        self.H = np.array([[1, 0, 0, 0],
+                           [0, 1, 0, 0]])
+
+        # Initial uncertainty
+        self.P = np.eye(4)
+
+        # No process or measurement noise
+        self.Q = np.zeros((4, 4))
+        self.R = np.zeros((2, 2))
+
+    @Element.position.setter
+    def position(self, position):
+        # Update the actual position
+        super(Plane, Plane).position.__set__(self, position)
+
+        # New measurement
+        z = np.array([[position[0]],
+                      [position[1]]])
+
+        # --- Predict ---
+        x_pred = self.A @ self.x_est
+        P_pred = self.A @ self.P @ self.A.T + self.Q
+
+        # --- Update ---
+        y = z - self.H @ x_pred
+        S = self.H @ P_pred @ self.H.T + self.R
+        K = P_pred @ self.H.T @ np.linalg.pinv(S)
+
+        self.x_est = x_pred + K @ y
+        self.P = (np.eye(4) - K @ self.H) @ P_pred
+
+        # --- Predict X where Y == ground_y ---
+        x_now, y_now, vx, vy = self.x_est.flatten()
+        if abs(vy) > 1e-8:
+            t_to_ground = (self.ground_y - y_now) / vy
+            if t_to_ground > 0:
+                x_at_y0 = x_now + vx * t_to_ground
+            else:
+                x_at_y0 = np.nan  # Already hit ground or going up
+        else:
+            x_at_y0 = np.nan  # No vertical velocity
+
+        self.predicted_x_at_y0 = x_at_y0 % 455
 
 
 class Fuel (Element):

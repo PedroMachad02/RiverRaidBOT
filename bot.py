@@ -1,3 +1,4 @@
+from math import nan
 import cv2
 import time
 import numpy as np
@@ -75,6 +76,10 @@ class Bot:
             if enemy.name == "Bridge":
                 if self.player.is_aligned(enemy, margin=50):
                     self.fire()
+            elif enemy.name == "Plane":
+                if enemy.predicted_x_at_y0 is not nan and abs(self.player.position[0] - enemy.predicted_x_at_y0) < 50:
+                    print(f"Predicted X at Y=450: {enemy.predicted_x_at_y0:.2f} VRUMMMMMMMMMMMMM")
+                    self.controls.input_commands([Command.UP])
 
             if self.player.is_aiming(enemy):
                 fuel_ahead = False
