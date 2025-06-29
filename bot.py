@@ -34,7 +34,7 @@ class Bot:
         # Act based on entities
         self.action()
 
-        # Clear all entities
+        # Clear entities
         self.fuels = []
         self.passings = []
 
@@ -73,15 +73,10 @@ class Bot:
         # Handle enemies
         self.enemies.sort(key=lambda e: e.position[1], reverse=True)
         for enemy in self.enemies:
-            if enemy.name == "Bridge":
-                if self.player.is_aligned(enemy, margin=50):
-                    self.fire()
-            elif enemy.name == "Plane":
-                if enemy.predicted_x_at_y0 is not nan and abs(self.player.position[0] - enemy.predicted_x_at_y0) < 50:
-                    print(f"Predicted X at Y=450: {enemy.predicted_x_at_y0:.2f} VRUMMMMMMMMMMMMM")
+            if enemy.name == "Plane":
+                if enemy.predicted_x_at_y0 is not nan and abs(self.player.position[0] - enemy.predicted_x_at_y0) < 70:
                     self.controls.input_commands([Command.UP])
-
-            if self.player.is_aiming(enemy):
+            if self.player.is_aiming(enemy, tolerance=5) or (enemy.name == "Bridge" and self.player.is_aligned(enemy, margin=50)):
                 fuel_ahead = False
                 for fuel in self.fuels:
                     if self.player.is_aligned(fuel) and fuel.position[1] > enemy.position[1]:
@@ -92,28 +87,24 @@ class Bot:
                     break
             elif self.player.is_aligned(enemy, margin=5) and self.player.y_diff(enemy) > 50:
                 self.move_to_element(enemy)
-                break
             elif self.player.is_aligned(enemy, margin=25) and self.player.y_diff(enemy) < 50:
                 self.move_to_element(enemy, avoid=True)
 
-
-        # Handle valid passings
+        # Handle valid passings considering fuels
+        near_fuels = [fuel for fuel in self.fuels if self.player.is_aligned(fuel, margin=35)]
+        near_fuels.sort(key=lambda f: f.position[1], reverse=True)
         self.passings.sort(key=lambda p: abs(self.player.x_diff(p)))
         for passing in self.passings:
             if passing.includes(self.player):
-                if abs(self.player.x_diff(passing)) > 20:
+                if (abs(self.player.x_diff(passing)) > 50 and len(near_fuels) > 0) or (abs(self.player.x_diff(passing)) > 15 and len(near_fuels) == 0):
                     self.move_to_element(passing)
-                    break
-                elif abs(self.player.x_diff(passing)) < 15:
-                    self.fuels.sort(key=lambda f: f.position[1], reverse=True)
-                    for fuel in self.fuels:
-                        if (self.player.is_aligned(fuel, margin=10) and not self.player.is_aiming(fuel)) or (self.player.y_diff(fuel) > 50 and abs(self.player.x_diff(fuel)) < 30):
-                            self.move_to_element(fuel)
-                            break
-            elif passing.is_aligned(self.player):
-                self.move_to_element(passing)
             else:
                 self.move_to_element(passing)
+            break
+
+        # Handle fuels
+        for fuel in near_fuels:
+            self.move_to_element(fuel)
             break
 
        
@@ -203,6 +194,7 @@ class Bot:
             # Check left/right based on green presence
             x, y = self.player.position
             offset = self.player.width // 2 + 18
+            second_offset = 30
 
             frame_height, frame_width = frame.shape[:2]
             left_x = max(0, x - offset)
@@ -210,18 +202,22 @@ class Bot:
             y = min(max(0, y), frame_height - 1) - 18
 
             # If pixel is blue, movement is allowed
-            self.player.can_move_left = blue_mask[y, left_x] > 0
-            self.player.can_move_right = blue_mask[y, right_x] > 0
+            self.player.can_move_left = blue_mask[y, left_x] > 0 and blue_mask[y + second_offset, left_x] > 0
+            self.player.can_move_right = blue_mask[y, right_x] > 0 and blue_mask[y + second_offset, right_x] > 0
 
             # Draw indicators
             if self.player.can_move_left:
                 cv2.circle(frame, (left_x, y), 3, (255, 255, 0), -1)
+                cv2.circle(frame, (left_x, y + second_offset), 3, (255, 255, 0), -1)
             else:
                 cv2.circle(frame, (left_x, y), 3, (0, 0, 255), -1)  
+                cv2.circle(frame, (left_x, y + second_offset), 3, (0, 0, 255), -1)  
             if self.player.can_move_right:
                 cv2.circle(frame, (right_x, y), 3, (255, 255, 0), -1)  
+                cv2.circle(frame, (right_x, y + second_offset), 3, (255, 255, 0), -1)  
             else:
                 cv2.circle(frame, (right_x, y), 3, (0, 0, 255), -1)  
+                cv2.circle(frame, (right_x, y + second_offset), 3, (0, 0, 255), -1)  
         else:
             self.player.can_move_left = True
             self.player.can_move_right = True

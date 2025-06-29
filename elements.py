@@ -147,7 +147,7 @@ class Plane (Enemy):
 
 class Fuel (Element):
     color = [(0, 100, 100), (5, 255, 255)] # Light Red
-    area = [229, 229]
+    area = [229.5, 229.5]
 
     def __init__(self, position):
         super().__init__("Fuel", position, width=20)
