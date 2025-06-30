@@ -28,6 +28,9 @@ class Input():
     def __init__(self, command):
         self.command = command
         self.time = time()
+    
+    def __repr__(self):
+        return f"{self.command} ({self.time})"
 
 class Controls:
     def __init__(self):
@@ -39,24 +42,29 @@ class Controls:
 
     def clear_buttons(self):
         self.buttons = [0] * 9  
-        self.inputs = []    
+        self.inputs = []
 
     def input_commands(self, commands, hold=True):
         for i, command in enumerate(commands):
             if hold is True:
-                self.inputs = [inp for inp in self.inputs if inp.command != command]
+                self.inputs = [inp for inp in self.inputs if inp.command.value != command.value]
 
             if hold is True or self.buttons[command.value] == 0:
                 self.inputs.append(Input(command))
                 self.buttons[command.value] = 1
 
     def update_inputs(self):        
+        print(self.buttons)
+        print(self.inputs)
+        current_time = time()
+        remove_count = 0
         for input in self.inputs:
-            if time() - input.time > 0.001:
+            if current_time - input.time > 0.001:
                 self.buttons[input.command.value] = 0
-                self.inputs.pop(0)
+                remove_count += 1
             else:
                 break
+        self.inputs = self.inputs[remove_count:]
 
     def process_key(self, key):
         if key != 255 and key in KEY_MAP:

@@ -34,6 +34,9 @@ class Element:
     
     def is_same (self, element):
         return self.name == element.name and abs(self.position[0] - element.position[0]) < 5 and abs(self.position[1] - element.position[1]) < 5
+    
+    def __str__(self):
+        return f"{self.name} {self.position}"
 
 
 class Player (Element):
@@ -57,6 +60,7 @@ class Player (Element):
 class Enemy (Element):
     def __init__(self, name, position, width):
         super().__init__(name, position, width)
+        self.is_moving = False
         
 
 
