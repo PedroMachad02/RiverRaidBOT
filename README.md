@@ -7,6 +7,8 @@ SEMESTER = "2025/1"
 PROFESSOR = "Marcos Laia"
 ```
 
+[**`> See the documentation (pt-BR) <`**](./docs/documentation-ptbr.pdf)
+
 &nbsp;
 
 ## 👾 About the game
@@ -15,7 +17,7 @@ River Raid is a video game for the Atari 2600 console, created by Carol Shaw in 
 
 &nbsp;
 
-## 🖥️ Run the game (Linux)
+## 🖥️ Run the game (Tested on Linux)
 
 1) Crete a python environment:
 
@@ -24,10 +26,16 @@ River Raid is a video game for the Atari 2600 console, created by Carol Shaw in 
     source .venv/bin/activate
     ```
 
-2) Run the game:
+2) Install dependencies:
 
     ```bash
-    python main.py
+    pip install -r requirements.txt
+    ```
+
+3) Run the game:
+
+    ```bash
+    python src/main.py
     ```
 
     You can also run the program with custom parameters by passing them using flags:
